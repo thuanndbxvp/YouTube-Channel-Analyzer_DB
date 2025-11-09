@@ -266,6 +266,14 @@ export const CompetitiveAnalysisModal: React.FC<CompetitiveAnalysisModalProps> =
                     <SpinnerIcon className="w-12 h-12 text-indigo-400 animate-spin mx-auto" />
                     <p className="mt-4 text-lg">AI đang phân tích dữ liệu...</p>
                     <p className="text-sm text-gray-400">Bạn có thể đóng cửa sổ này, quá trình vẫn sẽ tiếp tục chạy ngầm.</p>
+                    <div className="mt-6">
+                        <button
+                            onClick={onResetAnalysis}
+                            className="bg-red-800 hover:bg-red-900 text-white font-semibold text-sm py-2 px-6 rounded-md transition-colors"
+                        >
+                            Dừng phân tích
+                        </button>
+                    </div>
                 </div>
             );
         }
