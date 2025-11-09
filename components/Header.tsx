@@ -78,18 +78,17 @@ export const Header: React.FC<HeaderProps> = ({
     };
     
     return (
-        <header className="flex flex-col sm:flex-row items-center justify-between py-2 w-full">
+        <header className="flex flex-col items-center justify-center py-2 w-full space-y-6">
             <div className="flex-shrink-0">
                 <h1 className={`text-3xl md:text-4xl font-bold`}>
                     <a href="/" className={`flex items-center justify-center text-${theme}-300 hover:text-${theme}-200 transition-colors duration-200`}>
                         <YouTubeIcon className="w-10 h-10 md:w-12 md-h-12 mr-3" />
-                        <span className="hidden md:inline">Trình phân tích kênh YouTube</span>
-                         <span className="md:hidden">YT Analyzer</span>
+                        <span>Trình phân tích kênh YouTube</span>
                     </a>
                 </h1>
             </div>
 
-            <div className="flex items-center justify-center space-x-2 mt-4 sm:mt-0">
+            <div className="flex items-center justify-center flex-wrap gap-2">
                  <div className="relative" ref={themeDropdownRef}>
                     <button
                         onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}

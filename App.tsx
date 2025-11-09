@@ -316,12 +316,10 @@ export default function App() {
                   // Set analysis and config (cloud takes precedence)
                   if (cloudData.analysis_state) setAnalysisState(cloudData.analysis_state);
                   if (cloudData.app_settings) {
-                      setAppConfig(prev => ({
-                          ...prev, // Keep local API keys
-                          theme: cloudData.app_settings.theme || prev.theme,
-                          aiProvider: cloudData.app_settings.aiProvider || prev.aiProvider,
-                          aiModel: cloudData.app_settings.aiModel || prev.aiModel,
-                      }));
+                      // Cloud data is the source of truth. Merge with initial config
+                      // to ensure the object shape is correct, then set state.
+                      const cloudConfig = { ...initialConfig, ...cloudData.app_settings };
+                      setAppConfig(cloudConfig);
                   }
               }
               setIsDataSynced(true);
@@ -338,9 +336,8 @@ export default function App() {
         }
         debounceTimeoutRef.current = window.setTimeout(() => {
             console.log("Saving data to cloud...");
-            const { youtube, gemini, openai, ...settingsToSave } = appConfig;
             saveUserData({
-                app_settings: settingsToSave,
+                app_settings: appConfig,
                 library_sessions: savedSessions,
                 analysis_state: analysisState,
             });

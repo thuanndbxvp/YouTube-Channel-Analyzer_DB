@@ -5,6 +5,9 @@ export const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
+            // Explicitly set the redirect URL to the current page's origin.
+            // This can help resolve redirect issues in specific environments.
+            redirectTo: window.location.origin,
             queryParams: {
                 access_type: 'offline',
                 prompt: 'consent',

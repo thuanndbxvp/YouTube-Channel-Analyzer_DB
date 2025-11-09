@@ -92,7 +92,7 @@ export interface AnalysisState {
 
 // Data structure for Supabase
 export interface UserData {
-    app_settings: Omit<StoredConfig, 'youtube' | 'gemini' | 'openai'>;
+    app_settings: StoredConfig;
     library_sessions: SavedSession[];
     analysis_state: AnalysisState;
 }
