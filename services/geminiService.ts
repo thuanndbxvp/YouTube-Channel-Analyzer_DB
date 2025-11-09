@@ -1,5 +1,6 @@
 
 
+
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage } from '../types';
 
@@ -133,27 +134,22 @@ export const performCompetitiveAnalysis = async (
       const channelList = channelNames.join(', ');
 
       const fullPrompt = `
-        Với vai trò là một chuyên gia phân tích dữ liệu YouTube, hãy thực hiện nhiệm vụ phân tích cạnh tranh dựa trên các hướng dẫn và dữ liệu được cung cấp.
-
-        **Định nghĩa nhiệm vụ (JSON):**
-        \`\`\`json
         ${analysisInstructions}
-        \`\`\`
 
         ---
+        ### DỮ LIỆU ĐỂ PHÂN TÍCH
 
-        **Dữ liệu Video (CSV):**
-        Dưới đây là dữ liệu video từ nhiều kênh khác nhau. Các cột bao gồm: Channel Name, Video Title, Publish Date, View Count, Likes, Duration (ISO 8601).
+        Dưới đây là dữ liệu video từ các kênh được cung cấp dưới dạng CSV.
 
         \`\`\`csv
         ${csvData}
         \`\`\`
 
         ---
+        ### YÊU CẦU THỰC HIỆN
 
-        **Yêu cầu:**
-        Hãy thực hiện phân tích theo định nghĩa nhiệm vụ trong file JSON và trả về kết quả.
-        Tập trung vào việc tạo ra phần **"text_summary"** trước tiên, định dạng bằng Markdown rõ ràng, dễ đọc, tuân thủ văn phong và cấu trúc đã chỉ định. Sử dụng tiếng Việt cho toàn bộ báo cáo phân tích. Thêm một dòng "Các kênh phân tích: ${channelList}" vào bên dưới dòng "Người thực hiện:" ở đầu báo cáo.
+        Bây giờ, hãy bắt đầu phân tích và tạo báo cáo theo đúng cấu trúc đã yêu cầu.
+        Hãy thay thế "[Ngày hiện tại]" bằng ngày hôm nay và "[Liệt kê các kênh được phân tích]" bằng: ${channelList}.
       `;
 
       const response = await ai.models.generateContent({
