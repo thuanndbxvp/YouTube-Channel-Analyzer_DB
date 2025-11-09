@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { LibraryIcon, KeyIcon, YouTubeIcon, ChartBarIcon, SpinnerIcon, TrashIcon } from './Icons';
 import { StoredConfig, Theme } from '../types';
+import { User } from '@supabase/supabase-js';
+import { UserProfile } from './UserProfile';
 
 interface HeaderProps {
     onApiClick: () => void;
@@ -13,6 +15,10 @@ interface HeaderProps {
         isLoading: boolean;
         isComplete: boolean;
     };
+    user: User | null;
+    isAuthLoading: boolean;
+    onLogin: () => void;
+    onLogout: () => void;
 }
 
 const themes: Theme[] = ['blue', 'green', 'orange', 'red', 'purple'];
@@ -31,7 +37,19 @@ const PaintBrushIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 
-export const Header: React.FC<HeaderProps> = ({ onApiClick, onLibraryClick, theme, setAppConfig, onCompetitiveAnalysisClick, isCompetitiveAnalysisAvailable, analysisState }) => {
+export const Header: React.FC<HeaderProps> = ({ 
+    onApiClick, 
+    onLibraryClick, 
+    theme, 
+    setAppConfig, 
+    onCompetitiveAnalysisClick, 
+    isCompetitiveAnalysisAvailable, 
+    analysisState,
+    user,
+    isAuthLoading,
+    onLogin,
+    onLogout
+}) => {
     const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
     const themeDropdownRef = useRef<HTMLDivElement>(null);
     
@@ -53,35 +71,33 @@ export const Header: React.FC<HeaderProps> = ({ onApiClick, onLibraryClick, them
     }, []);
 
     const handleClearCache = () => {
-        if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu đã lưu (bao gồm API keys và các phiên đã lưu trong thư viện) không? Hành động này không thể hoàn tác.')) {
+        if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu CỤC BỘ đã lưu (bao gồm API keys và các phiên đã lưu trong thư viện trên máy này) không? Dữ liệu trên đám mây (nếu có) sẽ không bị ảnh hưởng.')) {
             window.localStorage.clear();
             window.location.reload();
         }
     };
     
     return (
-        <header className="flex flex-col items-center text-center py-2">
-            <div>
+        <header className="flex flex-col sm:flex-row items-center justify-between py-2 w-full">
+            <div className="flex-shrink-0">
                 <h1 className={`text-3xl md:text-4xl font-bold`}>
                     <a href="/" className={`flex items-center justify-center text-${theme}-300 hover:text-${theme}-200 transition-colors duration-200`}>
-                        <YouTubeIcon className="w-10 h-10 md:w-12 md:h-12 mr-3" />
-                        Trình phân tích kênh YouTube
+                        <YouTubeIcon className="w-10 h-10 md:w-12 md-h-12 mr-3" />
+                        <span className="hidden md:inline">Trình phân tích kênh YouTube</span>
+                         <span className="md:hidden">YT Analyzer</span>
                     </a>
                 </h1>
-                <p className="text-gray-400 mt-1">
-                    Nhận thông tin chi tiết và tóm tắt do AI tạo ra cho các video gần đây nhất.
-                </p>
             </div>
 
-            <div className="flex items-center justify-center space-x-2 mt-6">
+            <div className="flex items-center justify-center space-x-2 mt-4 sm:mt-0">
                  <div className="relative" ref={themeDropdownRef}>
                     <button
                         onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-                        className="flex items-center justify-center bg-gray-700 hover:bg-gray-800 text-white font-semibold p-1.5 rounded-md transition-colors duration-200"
+                        className="flex items-center justify-center bg-gray-700 hover:bg-gray-800 text-white font-semibold p-2.5 rounded-md transition-colors duration-200"
                         aria-label="Chọn giao diện"
                         title="Chọn màu giao diện"
                     >
-                        <PaintBrushIcon className="w-4 h-4" />
+                        <PaintBrushIcon className="w-5 h-5" />
                     </button>
 
                     {isThemeDropdownOpen && (
@@ -103,8 +119,8 @@ export const Header: React.FC<HeaderProps> = ({ onApiClick, onLibraryClick, them
                 <button 
                     onClick={onLibraryClick}
                     title="Mở thư viện các phiên đã lưu"
-                    className="flex items-center justify-center bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-semibold py-1.5 px-3 rounded-md transition-colors duration-200">
-                    <LibraryIcon className="w-4 h-4 mr-1.5" />
+                    className="flex items-center justify-center bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-semibold py-2 px-4 rounded-md transition-colors duration-200">
+                    <LibraryIcon className="w-5 h-5 mr-1.5" />
                     Thư viện
                 </button>
                 <div className="relative">
@@ -112,14 +128,14 @@ export const Header: React.FC<HeaderProps> = ({ onApiClick, onLibraryClick, them
                         onClick={onCompetitiveAnalysisClick}
                         disabled={!isCompetitiveAnalysisAvailable && !analysisState.isLoading}
                         title={!isCompetitiveAnalysisAvailable ? "Cần ít nhất 2 kênh đã lưu để phân tích đối thủ" : "Phân tích đối thủ"}
-                        className="flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-1.5 px-3 rounded-md transition-colors duration-200 disabled:opacity-50"
+                        className="flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 px-4 rounded-md transition-colors duration-200 disabled:opacity-50"
                     >
                         {analysisState.isLoading ? (
-                            <SpinnerIcon className="w-4 h-4 mr-1.5 animate-spin" />
+                            <SpinnerIcon className="w-5 h-5 mr-1.5 animate-spin" />
                         ) : (
-                            <ChartBarIcon className="w-4 h-4 mr-1.5" />
+                            <ChartBarIcon className="w-5 h-5 mr-1.5" />
                         )}
-                        {analysisState.isLoading ? 'Đang phân tích...' : 'Đối thủ'}
+                        {analysisState.isLoading ? 'Đang...' : 'Đối thủ'}
                     </button>
                     {analysisState.isComplete && !analysisState.isLoading && (
                         <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -131,17 +147,24 @@ export const Header: React.FC<HeaderProps> = ({ onApiClick, onLibraryClick, them
                 <button 
                     onClick={onApiClick} 
                     title="Quản lý API Keys"
-                    className="flex items-center justify-center bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold py-1.5 px-3 rounded-md transition-colors duration-200">
-                    <KeyIcon className="w-4 h-4 mr-1.5" />
+                    className="flex items-center justify-center bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold py-2 px-4 rounded-md transition-colors duration-200">
+                    <KeyIcon className="w-5 h-5 mr-1.5" />
                     API
                 </button>
                 <button 
                     onClick={handleClearCache} 
                     title="Xóa toàn bộ dữ liệu cục bộ của ứng dụng (API Keys, Thư viện, v.v.)"
-                    className="flex items-center justify-center bg-red-800 hover:bg-red-900 text-white text-sm font-semibold py-1.5 px-3 rounded-md transition-colors duration-200">
-                    <TrashIcon className="w-4 h-4 mr-1.5" />
+                    className="flex items-center justify-center bg-red-800 hover:bg-red-900 text-white text-sm font-semibold py-2 px-4 rounded-md transition-colors duration-200">
+                    <TrashIcon className="w-5 h-5 mr-1.5" />
                     Xóa Cache
                 </button>
+                <UserProfile 
+                    user={user}
+                    isLoading={isAuthLoading}
+                    onLogin={onLogin}
+                    onLogout={onLogout}
+                    theme={theme}
+                />
             </div>
         </header>
     );

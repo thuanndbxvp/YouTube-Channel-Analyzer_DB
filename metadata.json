@@ -1,5 +1,5 @@
 {
-  "name": "YouTube Channel Analyzer_DB",
+  "name": "YouTube Channel Analyzer",
   "description": "An AI-powered tool to get detailed information and summaries for videos from any YouTube channel. Requires user-provided API keys for YouTube, Gemini, and OpenAI.",
   "requestFramePermissions": []
 }

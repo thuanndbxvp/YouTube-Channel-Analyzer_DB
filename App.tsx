@@ -1,6 +1,6 @@
 
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ApiModal } from './components/ApiModal';
 import { LibraryModal } from './components/LibraryModal';
@@ -18,6 +18,10 @@ import { ChannelHeader } from './components/ChannelHeader';
 import { CompetitiveAnalysisModal } from './components/CompetitiveAnalysisModal';
 import { TrashIcon, SpinnerIcon, ClipboardCopyIcon } from './components/Icons';
 import { formatDate, parseISO8601Duration } from './utils/formatters';
+import { User } from '@supabase/supabase-js';
+import { onAuthStateChange, signInWithGoogle, signOut } from './services/authService';
+import { getUserData, saveUserData } from './services/dataService';
+import { UserProfile } from './components/UserProfile';
 
 // FIX: `declare` must be at the top level. Moved from handleExportAllToExcel.
 // Make XLSX globally available from the script tag in index.html
@@ -252,7 +256,12 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ isOpen, onClose, vide
 export default function App() {
   const [appConfig, setAppConfig] = useLocalStorage<StoredConfig>('yt-analyzer-config-v2', initialConfig);
   const [savedSessions, setSavedSessions] = useLocalStorage<SavedSession[]>('yt-analyzer-sessions-v1', []);
+  const [analysisState, setAnalysisState] = useLocalStorage('yt-analyzer-analysis-v1', initialAnalysisState);
   
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isDataSynced, setIsDataSynced] = useState(false);
+
   const [isApiModalOpen, setIsApiModalOpen] = useState(false);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
   const [isCompetitiveAnalysisModalOpen, setIsCompetitiveAnalysisModalOpen] = useState(false);
@@ -273,29 +282,78 @@ export default function App() {
 
   const [transcriptModalState, setTranscriptModalState] = useState(initialTranscriptState);
 
-  const [analysisState, setAnalysisState] = useLocalStorage('yt-analyzer-analysis-v1', initialAnalysisState);
-  
-  useEffect(() => {
-      const oldConfig = appConfig as any;
-      if(oldConfig && !oldConfig.aiProvider && (oldConfig.gemini?.model || oldConfig.openai?.model)) {
-          console.log("Migrating config to new AI model structure.");
-          setAppConfig(prev => {
-              const currentOldConfig = prev as any;
-              const provider: AiProvider = currentOldConfig.gemini?.model ? 'gemini' : 'openai';
-              const model = currentOldConfig.gemini?.model || currentOldConfig.openai?.model;
+  const debounceTimeoutRef = useRef<number | null>(null);
 
-              const newConfig: StoredConfig = {
-                  theme: currentOldConfig.theme,
-                  youtube: { key: currentOldConfig.youtube.key },
-                  gemini: { key: currentOldConfig.gemini.key },
-                  openai: { key: currentOldConfig.openai.key },
-                  aiProvider: provider,
-                  aiModel: model || (provider === 'openai' ? 'gpt-4o' : 'gemini-2.5-pro'),
-              };
-              return newConfig;
-          });
-      }
+  // --- Auth & Data Sync Effects ---
+  useEffect(() => {
+      const { subscription } = onAuthStateChange((_event, session) => {
+          setUser(session?.user ?? null);
+          setIsAuthLoading(false);
+      });
+      return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+      const syncData = async () => {
+          if (user && !isDataSynced) {
+              const cloudData = await getUserData();
+              if (cloudData) {
+                  // Merge sessions
+                  const localSessions = savedSessions;
+                  const cloudSessions = cloudData.library_sessions || [];
+                  const mergedSessionsMap = new Map<string, SavedSession>();
+                  
+                  localSessions.forEach(s => mergedSessionsMap.set(s.id, s));
+                  cloudSessions.forEach(s => {
+                      const existing = mergedSessionsMap.get(s.id);
+                      if (!existing || new Date(s.savedAt) > new Date(existing.savedAt)) {
+                          mergedSessionsMap.set(s.id, s);
+                      }
+                  });
+                  const finalSessions = Array.from(mergedSessionsMap.values());
+                  setSavedSessions(finalSessions);
+
+                  // Set analysis and config (cloud takes precedence)
+                  if (cloudData.analysis_state) setAnalysisState(cloudData.analysis_state);
+                  if (cloudData.app_settings) {
+                      setAppConfig(prev => ({
+                          ...prev, // Keep local API keys
+                          theme: cloudData.app_settings.theme || prev.theme,
+                          aiProvider: cloudData.app_settings.aiProvider || prev.aiProvider,
+                          aiModel: cloudData.app_settings.aiModel || prev.aiModel,
+                      }));
+                  }
+              }
+              setIsDataSynced(true);
+          }
+      };
+      syncData();
+  }, [user, isDataSynced, savedSessions, setSavedSessions, setAnalysisState, setAppConfig]);
+
+  // Debounced save to Supabase
+  useEffect(() => {
+    if (user && isDataSynced) {
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+        debounceTimeoutRef.current = window.setTimeout(() => {
+            console.log("Saving data to cloud...");
+            const { youtube, gemini, openai, ...settingsToSave } = appConfig;
+            saveUserData({
+                app_settings: settingsToSave,
+                library_sessions: savedSessions,
+                analysis_state: analysisState,
+            });
+        }, 2000); // 2-second debounce
+    }
+
+    return () => {
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+    };
+  }, [appConfig, savedSessions, analysisState, user, isDataSynced]);
+
 
   useEffect(() => {
     // Prevent analysis from being stuck in a loading state on page reload
@@ -818,6 +876,10 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
             onCompetitiveAnalysisClick={() => setIsCompetitiveAnalysisModalOpen(true)}
             isCompetitiveAnalysisAvailable={savedSessions.length >= 2}
             analysisState={analysisState}
+            user={user}
+            isAuthLoading={isAuthLoading}
+            onLogin={signInWithGoogle}
+            onLogout={signOut}
         />
         <main className="mt-8">
           <ChannelInputForm onSubmit={handleQueueSubmit} isLoading={!!currentlyAnalyzingUrl} theme={appConfig.theme} />
@@ -832,7 +894,14 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
           
           {error && <div className="mt-4 text-center text-red-400 bg-red-900/50 p-3 rounded-lg">{error}</div>}
           
-          {videos.length > 0 && channelInfo && (
+          {isLoading && (
+              <div className="text-center py-12">
+                  <SpinnerIcon className="w-10 h-10 mx-auto animate-spin text-gray-400" />
+                  <p className="mt-4 text-gray-300">Đang tải dữ liệu kênh...</p>
+              </div>
+          )}
+
+          {videos.length > 0 && channelInfo && !isLoading && (
             <div className="mt-8 p-6 bg-[#24283b] rounded-lg">
                 <ChannelHeader channelInfo={channelInfo} />
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6 mb-6">

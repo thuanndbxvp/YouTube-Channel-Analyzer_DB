@@ -82,3 +82,17 @@ export interface UserProfile {
   email: string;
   picture: string;
 }
+
+export interface AnalysisState {
+  isLoading: boolean;
+  error: string | null;
+  result: string;
+  isComplete: boolean;
+}
+
+// Data structure for Supabase
+export interface UserData {
+    app_settings: Omit<StoredConfig, 'youtube' | 'gemini' | 'openai'>;
+    library_sessions: SavedSession[];
+    analysis_state: AnalysisState;
+}
