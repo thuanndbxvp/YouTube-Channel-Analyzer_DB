@@ -96,3 +96,10 @@ export interface UserData {
     library_sessions: SavedSession[];
     analysis_state: AnalysisState;
 }
+
+export interface VideoAnalysis {
+  summary: string;
+  visualStyle: string;
+  contentTone: string;
+  transcript: string;
+}

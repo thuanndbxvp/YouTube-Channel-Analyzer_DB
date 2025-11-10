@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Video, Theme } from '../types';
-import { EyeIcon, LikeIcon, PlayIcon, SortAscIcon, SortDescIcon, ClockIcon, DocumentTextIcon } from './Icons';
+import { EyeIcon, LikeIcon, PlayIcon, SortAscIcon, SortDescIcon, ClockIcon, SparklesIcon } from './Icons';
 import { parseISO8601Duration, formatNumber, formatDate } from '../utils/formatters';
 
 interface VideoTableProps {
   videos: Video[];
   theme: Theme;
-  onGetTranscript: (video: Video) => void;
+  onAnalyzeVideo: (video: Video) => void;
 }
 
 type SortKey = 'publishedAt' | 'viewCount' | 'likeCount' | 'duration';
@@ -39,7 +39,7 @@ const SortableHeader: React.FC<{
   );
 };
 
-export const VideoTable: React.FC<VideoTableProps> = ({ videos, theme, onGetTranscript }) => {
+export const VideoTable: React.FC<VideoTableProps> = ({ videos, theme, onAnalyzeVideo }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'publishedAt', direction: 'desc' });
 
   const sortedVideos = useMemo(() => {
@@ -150,11 +150,11 @@ export const VideoTable: React.FC<VideoTableProps> = ({ videos, theme, onGetTran
                         <PlayIcon className="w-4 h-4" />
                     </a>
                      <button
-                        onClick={() => onGetTranscript(video)}
-                        title="Lấy transcript video"
+                        onClick={() => onAnalyzeVideo(video)}
+                        title="Phân tích Video bằng AI"
                         className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg transition-colors duration-200"
                     >
-                        <DocumentTextIcon className="w-4 h-4" />
+                        <SparklesIcon className="w-4 h-4" />
                     </button>
                  </div>
               </td>

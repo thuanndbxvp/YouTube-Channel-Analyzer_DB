@@ -1,7 +1,5 @@
-
-
 import { GoogleGenAI } from "@google/genai";
-import { ChatMessage } from '../types';
+import { ChatMessage, VideoAnalysis } from '../types';
 
 async function executeWithKeyRotation<T>(
     keysString: string,
@@ -172,11 +170,11 @@ export const performCompetitiveAnalysis = async (
   });
 };
 
-export const generateTranscriptWithGemini = async (
+export const analyzeVideoWithGemini = async (
     apiKeys: string,
     model: string,
     videoId: string
-): Promise<string> => {
+): Promise<VideoAnalysis> => {
     return executeWithKeyRotation(apiKeys, async (apiKey) => {
         if (!apiKey) {
             throw new Error("Gemini API key is not provided.");
@@ -185,20 +183,31 @@ export const generateTranscriptWithGemini = async (
             const ai = new GoogleGenAI({ apiKey });
             const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-            const prompt = `Vui lòng trích xuất transcript (bản ghi lời) chính xác cho video tại URL sau: ${videoUrl}. Chỉ trả về nội dung transcript. Nếu video không có transcript hoặc không thể truy cập, hãy trả về duy nhất chuỗi: "ERROR: Không thể lấy được transcript cho video này."`;
+            const prompt = `Phân tích chi tiết video YouTube tại URL sau: ${videoUrl}. Vui lòng cung cấp câu trả lời của bạn dưới dạng một đối tượng JSON. Đối tượng phải có cấu trúc sau: { "summary": "Một bản tóm tắt ngắn gọn, súc tích về nội dung chính của video (3-4 câu).", "visualStyle": "Phân tích phong cách hình ảnh: tốc độ dựng phim (nhanh/chậm), loại cảnh quay (cận cảnh, toàn cảnh), màu sắc (sặc sỡ, trầm), và các hiệu ứng đặc biệt được sử dụng.", "contentTone": "Phân tích về giọng điệu và phong cách nội dung: trang trọng, hài hước, giáo dục, kể chuyện, bí ẩn, v.v.", "transcript": "Toàn bộ transcript (bản ghi lời nói) của video. Nếu không có, trả về một chuỗi trống." } Chỉ trả về đối tượng JSON, không có bất kỳ văn bản giải thích nào khác.`;
             
             const response = await ai.models.generateContent({
                 model,
                 contents: [{ parts: [{ text: prompt }] }],
+                config: {
+                    responseMimeType: "application/json",
+                }
             });
 
-            return response.text;
-        } catch (error) {
-            console.error("Error generating transcript with Gemini:", error);
-            if (error instanceof Error) {
-                throw new Error(`Lỗi từ Gemini API: ${error.message}`);
+            const jsonText = response.text.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+            const analysisResult = JSON.parse(jsonText);
+            
+            if (typeof analysisResult.summary !== 'string' || typeof analysisResult.visualStyle !== 'string' || typeof analysisResult.contentTone !== 'string' || typeof analysisResult.transcript !== 'string') {
+                 throw new Error("Định dạng phản hồi từ AI không hợp lệ.");
             }
-            throw new Error("Đã xảy ra lỗi không xác định khi tạo transcript.");
+
+            return analysisResult;
+        } catch (error) {
+            console.error("Error analyzing video with Gemini:", error);
+            if (error instanceof Error) {
+                const message = error.message.includes('JSON') ? 'AI đã trả về định dạng không hợp lệ, vui lòng thử lại.' : error.message;
+                throw new Error(`Lỗi từ Gemini API: ${message}`);
+            }
+            throw new Error("Đã xảy ra lỗi không xác định khi phân tích video.");
         }
     });
 };

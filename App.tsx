@@ -1,22 +1,19 @@
-
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ApiModal } from './components/ApiModal';
 import { LibraryModal } from './components/LibraryModal';
 import { ChannelInputForm } from './components/ChannelInputForm';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { Video, ChannelInfo, StoredConfig, SavedSession, ChatMessage, Theme, AnalysisState } from './types';
+import { Video, ChannelInfo, StoredConfig, SavedSession, ChatMessage, Theme, AnalysisState, VideoAnalysis } from './types';
 import { getChannelInfoByUrl, fetchVideosPage } from './services/youtubeService';
-import { generateTranscriptWithGemini, performCompetitiveAnalysis } from './services/geminiService';
-import { generateTranscriptWithOpenAI } from './services/openaiService';
+import { analyzeVideoWithGemini, performCompetitiveAnalysis } from './services/geminiService';
 import { VideoTable } from './components/VideoTable';
 import { KeywordAnalysis } from './components/KeywordAnalysis';
 import { AnalysisTools } from './components/AnalysisTools';
 import { calculateKeywordCounts, getTopKeywords } from './utils/keywords';
 import { ChannelHeader } from './components/ChannelHeader';
 import { CompetitiveAnalysisModal } from './components/CompetitiveAnalysisModal';
-import { TrashIcon, SpinnerIcon, ClipboardCopyIcon } from './components/Icons';
+import { TrashIcon, SpinnerIcon, ClipboardCopyIcon, SparklesIcon } from './components/Icons';
 import { formatDate, parseISO8601Duration } from './utils/formatters';
 import { User } from '@supabase/supabase-js';
 import { onAuthStateChange, signInWithGoogle, signOut } from './services/authService';
@@ -35,10 +32,10 @@ const initialConfig: StoredConfig = {
   openai: { key: '' },
 };
 
-const initialTranscriptState = {
+const initialVideoAnalysisState = {
     isOpen: false,
     video: null as Video | null,
-    transcript: '',
+    analysis: null as VideoAnalysis | null,
     isLoading: false,
     error: null as string | null,
     currentVideoId: null as string | null,
@@ -169,18 +166,18 @@ const ChannelQueueList: React.FC<ChannelQueueListProps> = ({
 };
 
 
-// --- START: Transcript Modal Component ---
-interface TranscriptModalProps {
+// --- START: VideoAnalysisModal Component ---
+interface VideoAnalysisModalProps {
     isOpen: boolean;
     onClose: () => void;
     video: Video | null;
-    transcript: string;
+    analysis: VideoAnalysis | null;
     isLoading: boolean;
     error: string | null;
     theme: Theme;
 }
 
-const TranscriptModal: React.FC<TranscriptModalProps> = ({ isOpen, onClose, video, transcript, isLoading, error, theme }) => {
+const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({ isOpen, onClose, video, analysis, isLoading, error, theme }) => {
     const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
 
     useEffect(() => {
@@ -192,8 +189,32 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ isOpen, onClose, vide
     if (!isOpen) return null;
 
     const handleCopy = () => {
-        if (!transcript) return;
-        navigator.clipboard.writeText(transcript).then(() => {
+        if (!analysis) return;
+        
+        const fullReport = `
+BÁO CÁO PHÂN TÍCH VIDEO
+=========================
+Tiêu đề: ${video?.snippet.title}
+URL: https://www.youtube.com/watch?v=${video?.id}
+
+TÓM TẮT NỘI DUNG
+-----------------
+${analysis.summary}
+
+PHONG CÁCH HÌNH ẢNH
+--------------------
+${analysis.visualStyle}
+
+GIỌNG ĐIỆU & PHONG CÁCH
+-----------------------
+${analysis.contentTone}
+
+TRANSCRIPT
+----------
+${analysis.transcript || 'Không có.'}
+        `;
+        
+        navigator.clipboard.writeText(fullReport.trim()).then(() => {
             setCopyStatus('copied');
             setTimeout(() => setCopyStatus('idle'), 2000);
         });
@@ -204,7 +225,8 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ isOpen, onClose, vide
             return (
                 <div className="text-center py-12">
                     <SpinnerIcon className="w-10 h-10 mx-auto animate-spin text-gray-400" />
-                    <p className="mt-4 text-gray-300">AI đang lấy transcript... Quá trình này có thể mất một lúc.</p>
+                    <p className="mt-4 text-gray-300">AI đang phân tích video... Quá trình này có thể mất một lúc.</p>
+                     <p className="text-sm text-gray-500">Model sử dụng: gemini-2.5-pro</p>
                 </div>
             );
         }
@@ -216,18 +238,38 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ isOpen, onClose, vide
                 </div>
             );
         }
-        return (
-            <div className="bg-[#1a1b26] p-4 rounded-md h-full overflow-y-auto">
-                <p className="text-gray-300 text-sm whitespace-pre-wrap">{transcript}</p>
-            </div>
-        );
+        if (analysis) {
+             return (
+                <div className="bg-[#1a1b26] p-4 rounded-md h-full overflow-y-auto space-y-6 text-sm">
+                    <div>
+                        <h3 className={`text-lg font-bold text-${theme}-300 mb-2`}>Tóm tắt nội dung</h3>
+                        <p className="text-gray-300 whitespace-pre-wrap">{analysis.summary}</p>
+                    </div>
+                    <div>
+                        <h3 className={`text-lg font-bold text-${theme}-300 mb-2`}>Phong cách hình ảnh</h3>
+                        <p className="text-gray-300 whitespace-pre-wrap">{analysis.visualStyle}</p>
+                    </div>
+                    <div>
+                        <h3 className={`text-lg font-bold text-${theme}-300 mb-2`}>Giọng điệu & Phong cách</h3>
+                        <p className="text-gray-300 whitespace-pre-wrap">{analysis.contentTone}</p>
+                    </div>
+                    <details className="bg-black/20 p-3 rounded-lg">
+                        <summary className="cursor-pointer text-gray-400 hover:text-white font-semibold">Xem toàn bộ transcript</summary>
+                        <div className="mt-3 pt-3 border-t border-gray-700">
+                           <p className="text-gray-300 whitespace-pre-wrap text-xs">{analysis.transcript || 'Không có transcript.'}</p>
+                        </div>
+                    </details>
+                </div>
+            );
+        }
+        return null;
     };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 transition-opacity duration-300" onClick={onClose}>
             <div className="bg-[#24283b] rounded-lg shadow-2xl p-6 w-full max-w-2xl flex flex-col" style={{ height: '70vh' }} onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-white truncate pr-4">Transcript cho: {video?.snippet.title}</h2>
+                    <h2 className="text-xl font-bold text-white truncate pr-4 flex items-center"><SparklesIcon className={`w-6 h-6 mr-2 text-${theme}-400`}/>Phân tích AI cho: {video?.snippet.title}</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
                 </div>
 
@@ -238,11 +280,11 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ isOpen, onClose, vide
                 <div className="mt-6 flex justify-end items-center space-x-4">
                     <button 
                         onClick={handleCopy} 
-                        disabled={isLoading || !!error || !transcript}
+                        disabled={isLoading || !!error || !analysis}
                         className="flex items-center justify-center bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 text-sm disabled:opacity-50"
                     >
                         <ClipboardCopyIcon className="w-5 h-5 mr-2" />
-                        {copyStatus === 'copied' ? 'Đã sao chép!' : 'Sao chép'}
+                        {copyStatus === 'copied' ? 'Đã sao chép!' : 'Sao chép báo cáo'}
                     </button>
                     <button onClick={onClose} className={`py-2 px-6 rounded-lg bg-${theme}-600 hover:bg-${theme}-700 text-white font-semibold transition-colors`}>Đóng</button>
                 </div>
@@ -250,7 +292,7 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ isOpen, onClose, vide
         </div>
     );
 };
-// --- END: Transcript Modal Component ---
+// --- END: VideoAnalysisModal Component ---
 
 export default function App() {
   // --- STATE MANAGEMENT REFACTOR ---
@@ -319,7 +361,7 @@ export default function App() {
   const [channelQueue, setChannelQueue] = useState<string[]>([]);
   const [currentlyAnalyzingUrl, setCurrentlyAnalyzingUrl] = useState<string | null>(null);
 
-  const [transcriptModalState, setTranscriptModalState] = useState(initialTranscriptState);
+  const [videoAnalysisModalState, setVideoAnalysisModalState] = useState(initialVideoAnalysisState);
 
   const debounceTimeoutRef = useRef<number | null>(null);
 
@@ -751,54 +793,35 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
   };
 
 
-  const handleGetTranscript = async (video: Video) => {
-      setTranscriptModalState({
+  const handleAnalyzeVideo = async (video: Video) => {
+      setVideoAnalysisModalState({
           isOpen: true,
           video,
-          transcript: '',
+          analysis: null,
           isLoading: true,
           error: null,
           currentVideoId: video.id,
       });
 
-      const { aiProvider, gemini, openai } = appConfig;
-      let providerHasKey = false;
-      let providerName = '';
-
-      if (aiProvider === 'gemini') {
-          providerHasKey = !!gemini.key && gemini.key.trim() !== '';
-          providerName = 'Gemini';
-      } else { // 'openai'
-          providerHasKey = !!openai.key && openai.key.trim() !== '';
-          providerName = 'OpenAI';
-      }
-
-      if (!providerHasKey) {
-          const errorMsg = `Vui lòng thêm API Key cho ${providerName} và chọn model tương ứng trong phần cài đặt API để sử dụng tính năng này.`;
-          setTranscriptModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, error: errorMsg } : s));
+      const { gemini } = appConfig;
+      
+      if (!gemini.key || gemini.key.trim() === '') {
+          const errorMsg = `Tính năng này yêu cầu Gemini API Key. Vui lòng thêm key trong cài đặt API.`;
+          setVideoAnalysisModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, error: errorMsg } : s));
           setIsApiModalOpen(true);
           return;
       }
 
       try {
-          let transcriptText: string;
-          if (aiProvider === 'gemini') {
-              transcriptText = await generateTranscriptWithGemini(
-                  gemini.key,
-                  appConfig.aiModel,
-                  video.id
-              );
-          } else { // openai
-              transcriptText = await generateTranscriptWithOpenAI(
-                  openai.key,
-                  appConfig.aiModel,
-                  video.id
-              );
-          }
-          setTranscriptModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, transcript: transcriptText } : s));
+          const analysisResult = await analyzeVideoWithGemini(
+              gemini.key,
+              'gemini-2.5-pro', // Using the required model for video analysis
+              video.id
+          );
+          setVideoAnalysisModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, analysis: analysisResult } : s));
       } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định.';
-          setTranscriptModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, error: errorMsg } : s));
+          setVideoAnalysisModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, error: errorMsg } : s));
       }
   };
 
@@ -897,13 +920,13 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
         analysisState={analysisState}
         onResetAnalysis={handleResetCompetitiveAnalysis}
       />
-      <TranscriptModal 
-        isOpen={transcriptModalState.isOpen}
-        onClose={() => setTranscriptModalState(initialTranscriptState)}
-        video={transcriptModalState.video}
-        transcript={transcriptModalState.transcript}
-        isLoading={transcriptModalState.isLoading}
-        error={transcriptModalState.error}
+      <VideoAnalysisModal 
+        isOpen={videoAnalysisModalState.isOpen}
+        onClose={() => setVideoAnalysisModalState(initialVideoAnalysisState)}
+        video={videoAnalysisModalState.video}
+        analysis={videoAnalysisModalState.analysis}
+        isLoading={videoAnalysisModalState.isLoading}
+        error={videoAnalysisModalState.error}
         theme={appConfig.theme}
       />
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -961,7 +984,7 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
                         />
                     </div>
                 </div>
-                <VideoTable videos={videos} theme={appConfig.theme} onGetTranscript={handleGetTranscript} />
+                <VideoTable videos={videos} theme={appConfig.theme} onAnalyzeVideo={handleAnalyzeVideo} />
                  {nextPageToken && (
                     <div className="text-center mt-8">
                       <button
