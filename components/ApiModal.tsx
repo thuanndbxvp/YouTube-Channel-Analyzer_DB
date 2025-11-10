@@ -304,10 +304,10 @@ export const ApiModal: React.FC<ApiModalProps> = ({ isOpen, onClose, config, set
             </div>
         </div>
         
-        <div className="text-center text-xs text-gray-400 mt-6">
+        <div className="text-center text-xs text-gray-400 mt-6 p-2 bg-[#1a1b26] rounded-md">
           {user
-            ? `Cài đặt và API keys của bạn được đồng bộ an toàn với tài khoản của bạn.`
-            : `Bạn chưa đăng nhập. API keys chỉ được lưu trên thiết bị này.`
+            ? `💡 Cài đặt và API keys của bạn đang được đồng bộ hóa với tài khoản đám mây.`
+            : `💡 Bạn chưa đăng nhập. API keys và cài đặt chỉ được lưu trên thiết bị này.`
           }
         </div>
 

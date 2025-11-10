@@ -6,7 +6,7 @@ import { ApiModal } from './components/ApiModal';
 import { LibraryModal } from './components/LibraryModal';
 import { ChannelInputForm } from './components/ChannelInputForm';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { Video, ChannelInfo, StoredConfig, SavedSession, ChatMessage, Theme, AiProvider } from './types';
+import { Video, ChannelInfo, StoredConfig, SavedSession, ChatMessage, Theme, AnalysisState } from './types';
 import { getChannelInfoByUrl, fetchVideosPage } from './services/youtubeService';
 import { generateTranscriptWithGemini, performCompetitiveAnalysis } from './services/geminiService';
 import { generateTranscriptWithOpenAI } from './services/openaiService';
@@ -21,7 +21,6 @@ import { formatDate, parseISO8601Duration } from './utils/formatters';
 import { User } from '@supabase/supabase-js';
 import { onAuthStateChange, signInWithGoogle, signOut } from './services/authService';
 import { getUserData, saveUserData } from './services/dataService';
-import { UserProfile } from './components/UserProfile';
 
 // FIX: `declare` must be at the top level. Moved from handleExportAllToExcel.
 // Make XLSX globally available from the script tag in index.html
@@ -45,7 +44,7 @@ const initialTranscriptState = {
     currentVideoId: null as string | null,
 };
 
-const initialAnalysisState = {
+const initialAnalysisState: AnalysisState = {
   isLoading: false,
   error: null as string | null,
   result: '',
@@ -254,13 +253,53 @@ const TranscriptModal: React.FC<TranscriptModalProps> = ({ isOpen, onClose, vide
 // --- END: Transcript Modal Component ---
 
 export default function App() {
-  const [appConfig, setAppConfig] = useLocalStorage<StoredConfig>('yt-analyzer-config-v2', initialConfig);
-  const [savedSessions, setSavedSessions] = useLocalStorage<SavedSession[]>('yt-analyzer-sessions-v1', []);
-  const [analysisState, setAnalysisState] = useLocalStorage('yt-analyzer-analysis-v1', initialAnalysisState);
+  // --- STATE MANAGEMENT REFACTOR ---
+  // Local state is the source of truth for anonymous users, backed by localStorage.
+  const [localAppConfig, setLocalAppConfig] = useLocalStorage<StoredConfig>('yt-analyzer-config-v2', initialConfig);
+  const [localSavedSessions, setLocalSavedSessions] = useLocalStorage<SavedSession[]>('yt-analyzer-sessions-v1', []);
+  const [localAnalysisState, setLocalAnalysisState] = useLocalStorage<AnalysisState>('yt-analyzer-analysis-v1', initialAnalysisState);
+
+  // Synced state is used ONLY for logged-in users. It's held in memory and synced with Supabase.
+  const [syncedAppConfig, setSyncedAppConfig] = useState<StoredConfig | null>(null);
+  const [syncedSavedSessions, setSyncedSavedSessions] = useState<SavedSession[] | null>(null);
+  const [syncedAnalysisState, setSyncedAnalysisState] = useState<AnalysisState | null>(null);
   
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDataSynced, setIsDataSynced] = useState(false);
+
+  // --- DERIVED/ACTIVE STATE ---
+  // Based on login status, we decide which state source to use.
+  const isLoggedIn = !!user;
+  const appConfig = isLoggedIn ? (syncedAppConfig ?? initialConfig) : localAppConfig;
+  const savedSessions = isLoggedIn ? (syncedSavedSessions ?? []) : localSavedSessions;
+  const analysisState = isLoggedIn ? (syncedAnalysisState ?? initialAnalysisState) : localAnalysisState;
+
+  // Create unified setters that write to the correct state source.
+  const setAppConfig = useCallback((value: React.SetStateAction<StoredConfig>) => {
+    if (isLoggedIn) {
+      setSyncedAppConfig(prev => (typeof value === 'function' ? value(prev ?? initialConfig) : value));
+    } else {
+      setLocalAppConfig(value);
+    }
+  }, [isLoggedIn, setLocalAppConfig]);
+
+  const setSavedSessions = useCallback((value: React.SetStateAction<SavedSession[]>) => {
+    if (isLoggedIn) {
+      setSyncedSavedSessions(prev => (typeof value === 'function' ? value(prev ?? []) : value));
+    } else {
+      setLocalSavedSessions(value);
+    }
+  }, [isLoggedIn, setLocalSavedSessions]);
+  
+  const setAnalysisState = useCallback((value: React.SetStateAction<AnalysisState>) => {
+    if (isLoggedIn) {
+        setSyncedAnalysisState(prev => (typeof value === 'function' ? value(prev ?? initialAnalysisState) : value));
+    } else {
+        setLocalAnalysisState(value);
+    }
+  }, [isLoggedIn, setLocalAnalysisState]);
+  // --- END STATE MANAGEMENT REFACTOR ---
 
   const [isApiModalOpen, setIsApiModalOpen] = useState(false);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
@@ -286,20 +325,25 @@ export default function App() {
 
   // --- Auth & Data Sync Effects ---
   useEffect(() => {
-    // This logic detects a logout event (transition from logged-in to logged-out)
-    // and reloads the page to ensure a clean state separation between authenticated
-    // and anonymous sessions.
     const { subscription } = onAuthStateChange((_event, session) => {
-        if (user && !session) {
-            // User has logged out, reload the page to clear state
-            window.location.reload();
+        const currentUser = session?.user ?? null;
+
+        if (user && !currentUser) { // User has just logged out
+            window.location.reload(); // Reload to clear all in-memory state and revert to local storage
         } else {
-            setUser(session?.user ?? null);
+            setUser(currentUser);
             setIsAuthLoading(false);
+            if (!currentUser) {
+                // Explicitly clear synced state and reset flags if user logs out in another tab
+                setIsDataSynced(false);
+                setSyncedAppConfig(null);
+                setSyncedSavedSessions(null);
+                setSyncedAnalysisState(null);
+            }
         }
     });
     return () => subscription.unsubscribe();
-  }, [user]); // Dependency on `user` is crucial for detecting the state change.
+  }, [user]); // Dependency on `user` detects login/logout state changes.
 
 
   useEffect(() => {
@@ -307,35 +351,21 @@ export default function App() {
           if (user && !isDataSynced) {
               const cloudData = await getUserData();
               if (cloudData) {
-                  // Merge sessions
-                  const localSessions = savedSessions;
-                  const cloudSessions = cloudData.library_sessions || [];
-                  const mergedSessionsMap = new Map<string, SavedSession>();
-                  
-                  localSessions.forEach(s => mergedSessionsMap.set(s.id, s));
-                  cloudSessions.forEach(s => {
-                      const existing = mergedSessionsMap.get(s.id);
-                      if (!existing || new Date(s.savedAt) > new Date(existing.savedAt)) {
-                          mergedSessionsMap.set(s.id, s);
-                      }
-                  });
-                  const finalSessions = Array.from(mergedSessionsMap.values());
-                  setSavedSessions(finalSessions);
-
-                  // Set analysis and config (cloud takes precedence)
-                  if (cloudData.analysis_state) setAnalysisState(cloudData.analysis_state);
-                  if (cloudData.app_settings) {
-                      // Cloud data is the source of truth. Merge with initial config
-                      // to ensure the object shape is correct, then set state.
-                      const cloudConfig = { ...initialConfig, ...cloudData.app_settings };
-                      setAppConfig(cloudConfig);
-                  }
+                  // Cloud is the source of truth. NO MERGE.
+                  setSyncedSavedSessions(cloudData.library_sessions || []);
+                  setSyncedAnalysisState(cloudData.analysis_state || initialAnalysisState);
+                  setSyncedAppConfig({ ...initialConfig, ...cloudData.app_settings });
+              } else {
+                  // First time login: use local data as the starting point for the cloud.
+                  setSyncedSavedSessions(localSavedSessions);
+                  setSyncedAnalysisState(localAnalysisState);
+                  setSyncedAppConfig(localAppConfig);
               }
               setIsDataSynced(true);
           }
       };
       syncData();
-  }, [user, isDataSynced, savedSessions, setSavedSessions, setAnalysisState, setAppConfig]);
+  }, [user, isDataSynced, localSavedSessions, localAnalysisState, localAppConfig]);
 
   // Debounced save to Supabase
   useEffect(() => {
@@ -345,10 +375,11 @@ export default function App() {
         }
         debounceTimeoutRef.current = window.setTimeout(() => {
             console.log("Saving data to cloud...");
+            // Only save the synced state to the cloud.
             saveUserData({
-                app_settings: appConfig,
-                library_sessions: savedSessions,
-                analysis_state: analysisState,
+                app_settings: syncedAppConfig,
+                library_sessions: syncedSavedSessions,
+                analysis_state: syncedAnalysisState,
             });
         }, 2000); // 2-second debounce
     }
@@ -358,7 +389,7 @@ export default function App() {
             clearTimeout(debounceTimeoutRef.current);
         }
     };
-  }, [appConfig, savedSessions, analysisState, user, isDataSynced]);
+  }, [syncedAppConfig, syncedSavedSessions, syncedAnalysisState, user, isDataSynced]);
 
 
   useEffect(() => {

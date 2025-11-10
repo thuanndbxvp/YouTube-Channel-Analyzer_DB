@@ -164,10 +164,10 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, ses
           )}
         </div>
 
-        <div className="p-2 text-center text-xs text-gray-400 mt-2 flex-shrink-0">
+        <div className="p-2 text-center text-xs text-gray-400 mt-2 flex-shrink-0 bg-[#1a1b26] rounded-md">
           {user
-            ? `Thư viện của bạn được đồng bộ và lưu trữ an toàn trên đám mây.`
-            : 'Bạn chưa đăng nhập. Thư viện chỉ được lưu trên thiết bị này.'
+            ? `💡 Thư viện của bạn đang được đồng bộ và lưu trữ an toàn trên đám mây.`
+            : '💡 Bạn chưa đăng nhập. Thư viện chỉ được lưu trên thiết bị này.'
           }
         </div>
 
