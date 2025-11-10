@@ -173,7 +173,8 @@ export const performCompetitiveAnalysis = async (
 export const analyzeVideoWithGemini = async (
     apiKeys: string,
     model: string,
-    videoId: string
+    videoId: string,
+    videoTitle: string
 ): Promise<VideoAnalysis> => {
     return executeWithKeyRotation(apiKeys, async (apiKey) => {
         if (!apiKey) {
@@ -183,7 +184,7 @@ export const analyzeVideoWithGemini = async (
             const ai = new GoogleGenAI({ apiKey });
             const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-            const prompt = `Phân tích chi tiết video YouTube tại URL sau: ${videoUrl}. Vui lòng cung cấp câu trả lời của bạn dưới dạng một đối tượng JSON. Đối tượng phải có cấu trúc sau: { "summary": "Một bản tóm tắt ngắn gọn, súc tích về nội dung chính của video (3-4 câu).", "visualStyle": "Phân tích phong cách hình ảnh: tốc độ dựng phim (nhanh/chậm), loại cảnh quay (cận cảnh, toàn cảnh), màu sắc (sặc sỡ, trầm), và các hiệu ứng đặc biệt được sử dụng.", "contentTone": "Phân tích về giọng điệu và phong cách nội dung: trang trọng, hài hước, giáo dục, kể chuyện, bí ẩn, v.v.", "transcript": "Toàn bộ transcript (bản ghi lời nói) của video. Nếu không có, trả về một chuỗi trống." } Chỉ trả về đối tượng JSON, không có bất kỳ văn bản giải thích nào khác.`;
+            const prompt = `Phân tích chi tiết video YouTube có tiêu đề "${videoTitle}" tại URL sau: ${videoUrl}. Vui lòng cung cấp câu trả lời của bạn dưới dạng một đối tượng JSON. Đối tượng phải có cấu trúc sau: { "summary": "Một bản tóm tắt ngắn gọn, súc tích về nội dung chính của video (3-4 câu).", "visualStyle": "Phân tích phong cách hình ảnh: tốc độ dựng phim (nhanh/chậm), loại cảnh quay (cận cảnh, toàn cảnh), màu sắc (sặc sỡ, trầm), và các hiệu ứng đặc biệt được sử dụng.", "contentTone": "Phân tích về giọng điệu và phong cách nội dung: trang trọng, hài hước, giáo dục, kể chuyện, bí ẩn, v.v.", "transcript": "Toàn bộ transcript (bản ghi lời nói) của video. Nếu không có, trả về một chuỗi trống." } Chỉ trả về đối tượng JSON, không có bất kỳ văn bản giải thích nào khác.`;
             
             const response = await ai.models.generateContent({
                 model,

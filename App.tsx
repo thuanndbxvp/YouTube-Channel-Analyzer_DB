@@ -816,7 +816,8 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
           const analysisResult = await analyzeVideoWithGemini(
               gemini.key,
               'gemini-2.5-pro', // Using the required model for video analysis
-              video.id
+              video.id,
+              video.snippet.title
           );
           setVideoAnalysisModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, analysis: analysisResult } : s));
       } catch (err) {
