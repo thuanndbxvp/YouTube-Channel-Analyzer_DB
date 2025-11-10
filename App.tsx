@@ -1,6 +1,5 @@
 
 
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { ApiModal } from './components/ApiModal';
@@ -54,77 +53,58 @@ const initialAnalysisState = {
 };
 
 
-const analysisInstructions = `### BỐI CẢNH VÀ VAI TRÒ
-
-Bạn là một Chuyên gia Phân tích Dữ liệu YouTube cao cấp. Nhiệm vụ của bạn là phân tích dữ liệu thô (được cung cấp dưới dạng tệp CSV) từ các kênh YouTube cạnh tranh trong cùng một thị trường ngách (ví dụ: giáo dục tài chính, lịch sử kinh tế).
-
-Sản phẩm cuối cùng của bạn phải là một **Báo cáo Phân tích Cạnh tranh** chi tiết, chuyên nghiệp, và mang tính tư vấn chiến lược bằng **tiếng Việt**. Văn phong phải sâu sắc, tự tin và dựa trên dữ liệu, tương tự như báo cáo mẫu đã được cung cấp.
-
-### DỮ LIỆU ĐẦU VÀO
-
-Bạn sẽ nhận được dữ liệu từ các tệp CSV, bao gồm:
-1.  **Tổng Quan Thư Viện (\`Tong Quan Thu Vien.csv\`):** Chứa danh sách các kênh, Lượt Đăng Ký, Số Lượng Video.
-2.  **Chi tiết Kênh (\`[Tên Kênh].csv\`):** Chứa danh sách video của kênh đó, bao gồm Tiêu đề, Ngày đăng, Lượt xem, Lượt thích, và Thời lượng.
-
-### YÊU CẦU PHÂN TÍCH CHUYÊN SÂU
-
-Khi tạo báo cáo, bạn phải vượt qua việc liệt kê số liệu. Hãy tập trung vào việc **DIỄN GIẢI** dữ liệu để tìm ra các insight chiến lược. Báo cáo phải so sánh trực tiếp các kênh được phân tích và bao gồm các yếuá tố sau:
-
-1.  **Phân tích Hiệu suất (Performance):**
-    * Tính toán các chỉ số trung vị (Median) cho Lượt xem, Thời lượng, và Lượt xem/Ngày (VPD) để tránh sai lệch từ các video viral.
-    * **[Yếu tố mới] Tỷ lệ Tương tác (Engagement Rate):** Tính tỷ lệ Lượt thích / Lượt xem trung bình cho mỗi kênh.
-    * **[Yếu tố mới] Vận tốc Nội dung (Content Velocity):** Phân tích tần suất đăng bài (ví dụ: số video/tháng) dựa trên dữ liệu ngày đăng.
-    * **[Yếu tố mới] Hiệu suất Người đăng ký (Subscriber Efficiency):** Ước tính (nếu có thể) tỷ lệ Lượt xem / Lượt đăng ký để xem kênh nào tận dụng tệp khán giả tốt hơn.
-
-2.  **Phân tích Nội dung & Tiêu đề (Content & Title):**
-    * Đây là phần quan trọng nhất. Đừng chỉ liệt kê từ khóa.
-    * Xác định các video "Hit" (ví dụ: Top 10% về lượt xem hoặc VPD).
-    * Giải mã các **Mẫu Tiêu đề Tâm lý** thành công (ví dụ: Tạo sự Tò mò, Khẩn cấp (FOMO), Kiến thức Bí mật, Gây tranh cãi, Tuyên bố Giá trị Rõ ràng)[cite: 29, 30, 31, 32].
-    * Xác định các **Trụ cột Chủ đề (Topic Pillars)** chính của mỗi kênh (ví dụ: Kênh A tập trung vào "Lịch sử", Kênh B tập trung vào "Bí mật ngành tài chính").
-
-3.  **Phân tích Thời gian & Thời lượng (Time & Duration):**
-    * Xác định các "điểm ngọt" (sweet spots) về thời lượng video cho mỗi kênh (ví dụ: 5-10 phút vs. 20+ phút)[cite: 39, 41].
-    * Phân tích thời gian đăng bài (Ngày trong tuần, Khung giờ) và đưa ra nhận định[cite: 36, 37].
-
-### CẤU TRÚC BÁO CÁO BẮT BUỘC (TUÂN THỦ NGHIÊM NGẶT)
-
-Bạn PHẢI trình bày báo cáo của mình theo đúng 6 phần sau đây (dựa trên tệp \`.doc\` mẫu):
-
----
-
-**Ngày:** [Ngày hiện tại]
-**Người thực hiện:** Chuyên gia Phân tích Dữ liệu YouTube
-**Các kênh phân tích:** [Liệt kê các kênh được phân tích]
-
-**1. Tóm tắt cho Lãnh đạo (Executive Summary)**
-* Tổng hợp các phát hiện chính.
-* Xác định các chiến lược thành công cốt lõi (ví dụ: Kể chuyện vs. Chuyên sâu).
-* Đề xuất chiến lược cấp cao cho một kênh mới.
-
-**2. Tổng quan Hiệu suất các Kênh (Channel Performance Overview)**
-* Trình bày dưới dạng **BẢNG SO SÁNH**.
-* Các chỉ số bao gồm: Số video phân tích, Tổng Lượt xem, Lượt xem Trung vị/Video, Lượt xem/Ngày Trung vị (VPD), Thời lượng Trung vị, Tỷ lệ Tương tác (Likes/Views), Tần suất Đăng bài.
-* Đưa ra nhận định ngắn gọn sau bảng.
-
-**3. Phân tích Nội dung & Tiêu đề (Content & Title Analysis)**
-* Liệt kê các video hiệu suất cao nhất (Theo Lượt xem tuyệt đối và Theo Lượt xem/Ngày).
-* Phân tích sâu về các **Mẫu Tiêu đề Tâm lý** thành công (như đã yêu cầu ở trên).
-* Phân tích các **Trụ cột Chủ đề** và Từ khóa Nổi bật.
-
-**4. Phân tích Thời gian & Thời lượng (Time & Duration Analysis)**
-* Phân tích thời gian đăng bài hiệu quả.
-* Phân tích các nhóm thời lượng video thành công (ví dụ: "điểm ngọt").
-
-**5. Các insight chính (Key Insights)**
-* Trình bày 3-5 insight quan trọng nhất dưới dạng gạch đầu dòng (ví dụ: "Tâm lý học Thắng thế Từ khóa", "Hai Lối đi Rõ rệt", "Lời hứa về Giá trị là Vua")[cite: 44, 46, 48].
-
-**6. Đề xuất Chiến lược (Xây dựng Kênh Mới)**
-* Đây là phần tư vấn hành động.
-* **Định vị & Khác biệt hóa:** Đề xuất tên kênh, góc tiếp cận.
-* **Chiến lược Nội dung (Mô hình Hybrid):** Đề xuất sự kết hợp của Nội dung Trụ cột (Pillar Content) và Nội dung Hỗ trợ (Supporting Content)[cite: 55, 57].
-* **Lịch trình Đăng bài:** Đề xuất ngày/giờ cụ thể[cite: 60, 61].
-* **Chiến lược Tăng trưởng Ban đầu:** Tối ưu hóa tiêu đề, tương tác, v.v.[cite: 64, 65].
-`;
+const analysisInstructions = `{
+  "task": "YouTube Channel Competitive Analysis",
+  "language": "Vietnamese",
+  "input": {
+    "file_type": "CSV data from app",
+    "file_description": "Each row represents one video from a competitor channel. Columns include Channel name, Video title, Publish date, View count, Duration, Likes, etc."
+  },
+  "objectives": [
+    "1. Clean and normalize data fields.",
+    "2. Compute derived metrics: Views per Day (VPD), duration buckets.",
+    "3. Identify top-performing videos by absolute views and by Views per Day across all channels.",
+    "4. Detect recurring successful title patterns (numbers, exclamations, 'Top X', questions, etc.).",
+    "5. Extract high-lift keywords and bigrams from video titles.",
+    "6. Determine the most effective posting hours and weekdays.",
+    "7. Summarize per-channel performance metrics (median VPD, Shorts share, median duration).",
+    "8. Provide actionable insights: what makes high-performing videos stand out and how to replicate success."
+  ],
+  "expected_outputs": {
+    "text_summary": [
+      "Top performing channels (by total views, median VPD).",
+      "Optimal video duration group.",
+      "Best posting time windows.",
+      "Title/keyword patterns with the highest lift.",
+      "Insights explaining why high-performing videos work.",
+      "Strategic recommendations for future content themes and structure."
+    ]
+  },
+  "key_metrics": [
+    "views_per_day", "median_views", "median_vpd", "shorts_share", "median_duration_sec", "pattern_lift", "keyword_lift"
+  ],
+  "analysis_notes": [
+    "Use lift ratio (top 20% vs rest) for detecting patterns.",
+    "Perform keyword extraction in Vietnamese."
+  ],
+  "expected_style_of_summary": {
+    "tone": "Professional, analytical, data-driven, similar to consulting report, in Vietnamese.",
+    "sections": [
+      "1. Tóm tắt cho Lãnh đạo (Executive Summary)",
+      "2. Tổng quan Hiệu suất các Kênh (Channel Performance Overview)",
+      "3. Phân tích Nội dung & Tiêu đề (Content & Title Analysis)",
+      "4. Phân tích Thời gian & Thời lượng (Time & Duration Analysis)",
+      "5. Các insight chính (Key Insights)",
+      "6. Đề xuất Chiến lược (Xây dựng Kênh Mới): Dựa trên tất cả phân tích, hãy đề xuất một kế hoạch chi tiết để xây dựng một kênh mới thành công trong cùng ngách này. Tập trung vào các yếu tố khác biệt, lịch trình đăng bài, định dạng video và chiến lược tăng trưởng ban đầu."
+    ]
+  },
+  "output_format": {
+    "type": "text",
+    "parts": [
+      "C. Written summary in Markdown format (in Vietnamese)"
+    ]
+  }
+}`;
 
 interface ChannelQueueListProps {
   queue: string[];
