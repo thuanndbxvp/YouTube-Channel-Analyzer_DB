@@ -98,8 +98,15 @@ export interface UserData {
 }
 
 export interface VideoAnalysis {
-  summary: string;
-  visualStyle: string;
-  contentTone: string;
-  transcript: string;
+  verification: {
+    is_match: boolean;
+    found_title: string;
+    found_channel: string;
+  };
+  analysis: {
+    summary: string;
+    visualStyle: string;
+    contentTone: string;
+    transcript: string;
+  };
 }

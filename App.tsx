@@ -189,7 +189,8 @@ const VideoAnalysisModal: React.FC<VideoAnalysisModalProps> = ({ isOpen, onClose
     if (!isOpen) return null;
 
     const handleCopy = () => {
-        if (!analysis) return;
+        if (!analysis?.analysis) return;
+        const analysisData = analysis.analysis;
         
         const fullReport = `
 BÁO CÁO PHÂN TÍCH VIDEO
@@ -199,19 +200,19 @@ URL: https://www.youtube.com/watch?v=${video?.id}
 
 TÓM TẮT NỘI DUNG
 -----------------
-${analysis.summary}
+${analysisData.summary}
 
 PHONG CÁCH HÌNH ẢNH
 --------------------
-${analysis.visualStyle}
+${analysisData.visualStyle}
 
 GIỌNG ĐIỆU & PHONG CÁCH
 -----------------------
-${analysis.contentTone}
+${analysisData.contentTone}
 
 TRANSCRIPT
 ----------
-${analysis.transcript || 'Không có.'}
+${analysisData.transcript || 'Không có.'}
         `;
         
         navigator.clipboard.writeText(fullReport.trim()).then(() => {
@@ -234,29 +235,30 @@ ${analysis.transcript || 'Không có.'}
             return (
                 <div className="text-center py-12">
                     <p className="text-red-400">Lỗi:</p>
-                    <p className="mt-2 text-sm bg-red-900/50 p-3 rounded-md">{error}</p>
+                    <p className="mt-2 text-sm bg-red-900/50 p-3 rounded-md whitespace-pre-wrap">{error}</p>
                 </div>
             );
         }
-        if (analysis) {
+        if (analysis?.analysis) {
+            const analysisData = analysis.analysis;
              return (
                 <div className="bg-[#1a1b26] p-4 rounded-md h-full overflow-y-auto space-y-6 text-sm">
                     <div>
                         <h3 className={`text-lg font-bold text-${theme}-300 mb-2`}>Tóm tắt nội dung</h3>
-                        <p className="text-gray-300 whitespace-pre-wrap">{analysis.summary}</p>
+                        <p className="text-gray-300 whitespace-pre-wrap">{analysisData.summary}</p>
                     </div>
                     <div>
                         <h3 className={`text-lg font-bold text-${theme}-300 mb-2`}>Phong cách hình ảnh</h3>
-                        <p className="text-gray-300 whitespace-pre-wrap">{analysis.visualStyle}</p>
+                        <p className="text-gray-300 whitespace-pre-wrap">{analysisData.visualStyle}</p>
                     </div>
                     <div>
                         <h3 className={`text-lg font-bold text-${theme}-300 mb-2`}>Giọng điệu & Phong cách</h3>
-                        <p className="text-gray-300 whitespace-pre-wrap">{analysis.contentTone}</p>
+                        <p className="text-gray-300 whitespace-pre-wrap">{analysisData.contentTone}</p>
                     </div>
                     <details className="bg-black/20 p-3 rounded-lg">
                         <summary className="cursor-pointer text-gray-400 hover:text-white font-semibold">Xem toàn bộ transcript</summary>
                         <div className="mt-3 pt-3 border-t border-gray-700">
-                           <p className="text-gray-300 whitespace-pre-wrap text-xs">{analysis.transcript || 'Không có transcript.'}</p>
+                           <p className="text-gray-300 whitespace-pre-wrap text-xs">{analysisData.transcript || 'Không có transcript.'}</p>
                         </div>
                     </details>
                 </div>
@@ -820,6 +822,16 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
               video.snippet.title,
               video.snippet.channelTitle
           );
+
+          if (!analysisResult.verification.is_match) {
+            const mismatchError = `AI không thể xác nhận đúng video.
+- Yêu cầu: "${video.snippet.title}"
+- Tìm thấy: "${analysisResult.verification.found_title}"
+Vui lòng thử lại.`;
+            setVideoAnalysisModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, error: mismatchError } : s));
+            return;
+          }
+
           setVideoAnalysisModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, analysis: analysisResult } : s));
       } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định.';

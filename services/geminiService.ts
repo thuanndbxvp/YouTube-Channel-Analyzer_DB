@@ -184,15 +184,39 @@ export const analyzeVideoWithGemini = async (
         try {
             const ai = new GoogleGenAI({ apiKey });
 
-            const prompt = `Bạn là một chuyên gia phân tích video YouTube. Nhiệm vụ của bạn là phân tích video tại URL sau: https://www.youtube.com/watch?v=${videoId}.
+            const prompt = `Bạn là một AI chuyên gia phân tích video YouTube có khả năng truy cập và hiểu nội dung từ URL.
 
-Để đảm bảo bạn đang phân tích ĐÚNG video, hãy lưu ý các thông tin sau:
-- **Tiêu đề video phải là:** "${videoTitle}"
-- **Kênh đăng tải video phải là:** "${channelTitle}"
+**NHIỆM VỤ TỐI QUAN TRỌNG:** Phân tích chính xác và **DUY NHẤT** video tại URL sau: https://www.youtube.com/watch?v=${videoId}. KHÔNG được phân tích bất kỳ video nào khác có tiêu đề tương tự dựa trên kiến thức đã có.
 
-Hãy sử dụng các thông tin này để xác định chính xác video trước khi phân tích.
+**DỮ LIỆU ĐỂ XÁC MINH:**
+- **Tiêu đề video mong muốn:** "${videoTitle}"
+- **Kênh đăng tải mong muốn:** "${channelTitle}"
 
-Sau khi đã xác định đúng video, vui lòng cung cấp phân tích chi tiết dưới dạng một đối tượng JSON. Đối tượng phải có cấu trúc sau: { "summary": "Một bản tóm tắt ngắn gọn, súc tích về nội dung chính của video (3-4 câu).", "visualStyle": "Phân tích phong cách hình ảnh: tốc độ dựng phim (nhanh/chậm), loại cảnh quay (cận cảnh, toàn cảnh), màu sắc (sặc sỡ, trầm), và các hiệu ứng đặc biệt được sử dụng.", "contentTone": "Phân tích về giọng điệu và phong cách nội dung: trang trọng, hài hước, giáo dục, kể chuyện, bí ẩn, v.v.", "transcript": "Toàn bộ transcript (bản ghi lời nói) của video. Nếu không có, trả về một chuỗi trống." } Chỉ trả về đối tượng JSON, không có bất kỳ văn bản giải thích nào khác.`;
+**YÊU CẦU ĐẦU RA:**
+Bạn PHẢI trả lời bằng một đối tượng JSON duy nhất có cấu trúc như sau. KHÔNG thêm bất kỳ văn bản nào khác ngoài JSON.
+
+\`\`\`json
+{
+  "verification": {
+    "is_match": boolean,
+    "found_title": "string // Tiêu đề video bạn thực sự tìm thấy tại URL.",
+    "found_channel": "string // Tên kênh bạn thực sự tìm thấy tại URL."
+  },
+  "analysis": {
+    "summary": "string // Tóm tắt nội dung chính của video đã xác minh (3-4 câu).",
+    "visualStyle": "string // Phân tích phong cách hình ảnh: tốc độ dựng, màu sắc, hiệu ứng.",
+    "contentTone": "string // Phân tích giọng điệu và phong cách: trang trọng, hài hước, giáo dục, v.v.",
+    "transcript": "string // Transcript đầy đủ của video. Trả về chuỗi rỗng nếu không có."
+  }
+}
+\`\`\`
+
+**HƯỚNG DẪN THỰC HIỆN:**
+1.  Truy cập URL đã cho.
+2.  So sánh tiêu đề và tên kênh bạn tìm thấy với "DỮ LIỆU ĐỂ XÁC MINH".
+3.  Điền vào trường \`"is_match"\` là \`true\` nếu cả hai đều khớp, ngược lại là \`false\`.
+4.  Điền vào \`"found_title"\` và \`"found_channel"\` với thông tin bạn thực sự tìm thấy tại URL.
+5.  Nếu \`"is_match"\` là \`true\`, hãy tiến hành phân tích và điền vào mục \`"analysis"\`. Nếu là \`false\`, hãy để các trường trong \`"analysis"\` là chuỗi rỗng.`;
             
             const response = await ai.models.generateContent({
                 model,
@@ -203,10 +227,11 @@ Sau khi đã xác định đúng video, vui lòng cung cấp phân tích chi ti�
             });
 
             const jsonText = response.text.replace(/^```json\s*/, '').replace(/```$/, '').trim();
-            const analysisResult = JSON.parse(jsonText);
+            const analysisResult = JSON.parse(jsonText) as VideoAnalysis;
             
-            if (typeof analysisResult.summary !== 'string' || typeof analysisResult.visualStyle !== 'string' || typeof analysisResult.contentTone !== 'string' || typeof analysisResult.transcript !== 'string') {
-                 throw new Error("Định dạng phản hồi từ AI không hợp lệ.");
+             // Basic validation of the returned structure
+            if (!analysisResult.verification || !analysisResult.analysis) {
+                 throw new Error("Định dạng phản hồi từ AI không hợp lệ. Thiếu mục 'verification' hoặc 'analysis'.");
             }
 
             return analysisResult;
