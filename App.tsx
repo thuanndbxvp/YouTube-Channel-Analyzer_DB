@@ -286,12 +286,21 @@ export default function App() {
 
   // --- Auth & Data Sync Effects ---
   useEffect(() => {
-      const { subscription } = onAuthStateChange((_event, session) => {
-          setUser(session?.user ?? null);
-          setIsAuthLoading(false);
-      });
-      return () => subscription.unsubscribe();
-  }, []);
+    // This logic detects a logout event (transition from logged-in to logged-out)
+    // and reloads the page to ensure a clean state separation between authenticated
+    // and anonymous sessions.
+    const { subscription } = onAuthStateChange((_event, session) => {
+        if (user && !session) {
+            // User has logged out, reload the page to clear state
+            window.location.reload();
+        } else {
+            setUser(session?.user ?? null);
+            setIsAuthLoading(false);
+        }
+    });
+    return () => subscription.unsubscribe();
+  }, [user]); // Dependency on `user` is crucial for detecting the state change.
+
 
   useEffect(() => {
       const syncData = async () => {
@@ -831,6 +840,7 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
         config={appConfig}
         setConfig={setAppConfig}
         theme={appConfig.theme}
+        user={user}
       />
       <LibraryModal
         isOpen={isLibraryModalOpen}
@@ -844,6 +854,7 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
         onExportExcel={handleExportExcel}
         onExportJson={handleExportJson}
         onImport={handleImportSessions}
+        user={user}
       />
       <CompetitiveAnalysisModal
         isOpen={isCompetitiveAnalysisModalOpen}

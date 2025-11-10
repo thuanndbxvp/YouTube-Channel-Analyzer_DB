@@ -2,6 +2,7 @@ import React, { useMemo, useRef } from 'react';
 import { SavedSession, Theme } from '../types';
 import { TrashIcon, UsersIcon, VideoCameraIcon, ClockIcon, ArrowPathIcon, SpinnerIcon, UploadIcon, DownloadIcon } from './Icons';
 import { formatNumber } from '../utils/formatters';
+import { User } from '@supabase/supabase-js';
 
 interface LibraryModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface LibraryModalProps {
   onExportExcel: () => void;
   onExportJson: () => void;
   onImport: (sessions: SavedSession[]) => void;
+  user: User | null;
 }
 
 
@@ -28,7 +30,7 @@ const formatDate = (dateString: string): string => {
     });
 };
 
-export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, sessions, onLoad, onDelete, onUpdate, updatingSessionId, theme, onExportExcel, onExportJson, onImport }) => {
+export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, sessions, onLoad, onDelete, onUpdate, updatingSessionId, theme, onExportExcel, onExportJson, onImport, user }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const validSessions = useMemo(() => {
@@ -162,7 +164,14 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, ses
           )}
         </div>
 
-        <div className="mt-6 flex justify-between items-center">
+        <div className="p-2 text-center text-xs text-gray-400 mt-2 flex-shrink-0">
+          {user
+            ? `Thư viện của bạn được đồng bộ và lưu trữ an toàn trên đám mây.`
+            : 'Bạn chưa đăng nhập. Thư viện chỉ được lưu trên thiết bị này.'
+          }
+        </div>
+
+        <div className="mt-4 flex justify-between items-center">
             <div className="flex items-center space-x-2">
                  <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
                  <button 

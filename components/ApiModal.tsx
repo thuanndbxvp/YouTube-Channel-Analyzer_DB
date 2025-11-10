@@ -4,6 +4,7 @@ import { validateSingleApiKey as validateYoutubeKey } from '../services/youtubeS
 import { validateSingleApiKey as validateGeminiKey } from '../services/geminiService';
 import { validateSingleApiKey as validateOpenAIKey } from '../services/openaiService';
 import { CheckCircleIcon, XCircleIcon, TrashIcon, SpinnerIcon, UploadIcon, DownloadIcon } from './Icons';
+import { User } from '@supabase/supabase-js';
 
 interface ApiModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface ApiModalProps {
   config: StoredConfig;
   setConfig: React.Dispatch<React.SetStateAction<StoredConfig>>;
   theme: Theme;
+  user: User | null;
 }
 
 const GEMINI_MODELS = ['gemini-2.5-pro', 'gemini-2.5-flash'];
@@ -145,7 +147,7 @@ const parseKeysString = (keysString: string): KeyWithStatus[] =>
 const joinKeys = (keys: KeyWithStatus[]): string =>
     keys.map(k => k.value.trim()).filter(Boolean).join('\n');
 
-export const ApiModal: React.FC<ApiModalProps> = ({ isOpen, onClose, config, setConfig, theme }) => {
+export const ApiModal: React.FC<ApiModalProps> = ({ isOpen, onClose, config, setConfig, theme, user }) => {
   const [youtubeKeys, setYoutubeKeys] = useState<KeyWithStatus[]>([]);
   const [geminiKeys, setGeminiKeys] = useState<KeyWithStatus[]>([]);
   const [openaiKeys, setOpenaiKeys] = useState<KeyWithStatus[]>([]);
@@ -301,8 +303,15 @@ export const ApiModal: React.FC<ApiModalProps> = ({ isOpen, onClose, config, set
                 />
             </div>
         </div>
+        
+        <div className="text-center text-xs text-gray-400 mt-6">
+          {user
+            ? `Cài đặt và API keys của bạn được đồng bộ an toàn với tài khoản của bạn.`
+            : `Bạn chưa đăng nhập. API keys chỉ được lưu trên thiết bị này.`
+          }
+        </div>
 
-        <div className="mt-8 flex justify-between items-center">
+        <div className="mt-6 flex justify-between items-center">
             <div className="flex items-center space-x-2">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
                  <button 
