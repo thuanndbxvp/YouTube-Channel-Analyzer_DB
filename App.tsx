@@ -796,6 +796,19 @@ Làm thế nào để tôi có thể giúp bạn brainstorm ý tưởng video m�
 
 
   const handleAnalyzeVideo = async (video: Video) => {
+      // Check for cached analysis first
+      if (video.aiAnalysis && video.aiAnalysis.verification.is_match) {
+          setVideoAnalysisModalState({
+              isOpen: true,
+              video,
+              analysis: video.aiAnalysis,
+              isLoading: false,
+              error: null,
+              currentVideoId: video.id,
+          });
+          return; // Exit early
+      }
+
       setVideoAnalysisModalState({
           isOpen: true,
           video,
@@ -831,6 +844,23 @@ Vui lòng thử lại.`;
             setVideoAnalysisModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, error: mismatchError } : s));
             return;
           }
+
+          // --- NEW: Update state with the new analysis ---
+          const updatedVideos = videos.map(v => 
+              v.id === video.id ? { ...v, aiAnalysis: analysisResult } : v
+          );
+          setVideos(updatedVideos); // Update UI state
+
+          if (channelInfo) { // Update persisted session state
+              setSavedSessions(prevSessions => 
+                  prevSessions.map(session => 
+                      session.id === channelInfo.id 
+                          ? { ...session, videos: updatedVideos }
+                          : session
+                  )
+              );
+          }
+          // --- END NEW ---
 
           setVideoAnalysisModalState(s => (s.currentVideoId === video.id ? { ...s, isLoading: false, analysis: analysisResult } : s));
       } catch (err) {

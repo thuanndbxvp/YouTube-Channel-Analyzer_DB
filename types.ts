@@ -47,7 +47,7 @@ export interface Video {
   snippet: VideoSnippet;
   statistics: VideoStatistics;
   contentDetails: VideoContentDetails;
-  aiSummary?: string;
+  aiAnalysis?: VideoAnalysis;
 }
 
 export interface ChannelInfo {

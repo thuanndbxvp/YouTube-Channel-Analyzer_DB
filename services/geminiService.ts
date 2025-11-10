@@ -184,39 +184,44 @@ export const analyzeVideoWithGemini = async (
         try {
             const ai = new GoogleGenAI({ apiKey });
 
-            const prompt = `Bạn là một AI chuyên gia phân tích video YouTube có khả năng truy cập và hiểu nội dung từ URL.
+            const prompt = `**BỐI CẢNH:** Bạn là một hệ thống AI phân tích video, được giao nhiệm vụ phân tích một video YouTube cụ thể từ một URL. Độ chính xác là yếu tố quan trọng nhất. Phân tích sai video sẽ dẫn đến quyết định sai lầm cho người dùng.
 
-**NHIỆM VỤ TỐI QUAN TRỌNG:** Phân tích chính xác và **DUY NHẤT** video tại URL sau: https://www.youtube.com/watch?v=${videoId}. KHÔNG được phân tích bất kỳ video nào khác có tiêu đề tương tự dựa trên kiến thức đã có.
+**CAM KẾT CỦA BẠN:** "Tôi, với tư cách là một AI, cam kết sẽ truy cập và phân tích video TẠI URL được cung cấp. Tôi sẽ KHÔNG sử dụng kiến thức có sẵn về các video có tiêu đề tương tự. Tôi hiểu rằng việc không tuân thủ sẽ làm cho kết quả của tôi vô giá trị."
 
-**DỮ LIỆU ĐỂ XÁC MINH:**
-- **Tiêu đề video mong muốn:** "${videoTitle}"
-- **Kênh đăng tải mong muốn:** "${channelTitle}"
+**NHIỆM VỤ:**
 
-**YÊU CẦU ĐẦU RA:**
-Bạn PHẢI trả lời bằng một đối tượng JSON duy nhất có cấu trúc như sau. KHÔNG thêm bất kỳ văn bản nào khác ngoài JSON.
+**BƯỚC 1: XÁC MINH (BẮT BUỘC)**
+1. Truy cập URL: https://www.youtube.com/watch?v=${videoId}
+2. Trích xuất chính xác tiêu đề video và tên kênh từ URL đó.
+3. So sánh thông tin bạn trích xuất được với thông tin dưới đây:
+   - **Tiêu đề video yêu cầu:** "${videoTitle}"
+   - **Kênh yêu cầu:** "${channelTitle}"
+
+**BƯỚC 2: PHÂN TÍCH (CHỈ KHI XÁC MINH THÀNH CÔNG)**
+Nếu và chỉ nếu thông tin bạn trích xuất khớp CHÍNH XÁC với thông tin yêu cầu, hãy tiến hành phân tích video đó.
+
+**YÊU CẦU ĐỊNH DẠNG ĐẦU RA (JSON BẮT BUỘC):**
+Bạn PHẢI trả lời bằng một đối tượng JSON duy nhất. KHÔNG thêm bất kỳ văn bản nào khác.
 
 \`\`\`json
 {
   "verification": {
     "is_match": boolean,
-    "found_title": "string // Tiêu đề video bạn thực sự tìm thấy tại URL.",
+    "found_title": "string // Tiêu đề bạn thực sự tìm thấy tại URL.",
     "found_channel": "string // Tên kênh bạn thực sự tìm thấy tại URL."
   },
   "analysis": {
-    "summary": "string // Tóm tắt nội dung chính của video đã xác minh (3-4 câu).",
-    "visualStyle": "string // Phân tích phong cách hình ảnh: tốc độ dựng, màu sắc, hiệu ứng.",
-    "contentTone": "string // Phân tích giọng điệu và phong cách: trang trọng, hài hước, giáo dục, v.v.",
-    "transcript": "string // Transcript đầy đủ của video. Trả về chuỗi rỗng nếu không có."
+    "summary": "string // (Chỉ điền nếu is_match = true) Tóm tắt nội dung chính của video (3-4 câu).",
+    "visualStyle": "string // (Chỉ điền nếu is_match = true) Phân tích phong cách hình ảnh.",
+    "contentTone": "string // (Chỉ điền nếu is_match = true) Phân tích giọng điệu và phong cách.",
+    "transcript": "string // (Chỉ điền nếu is_match = true) Transcript đầy đủ. Trả về chuỗi rỗng nếu không có."
   }
 }
 \`\`\`
 
-**HƯỚNG DẪN THỰC HIỆN:**
-1.  Truy cập URL đã cho.
-2.  So sánh tiêu đề và tên kênh bạn tìm thấy với "DỮ LIỆU ĐỂ XÁC MINH".
-3.  Điền vào trường \`"is_match"\` là \`true\` nếu cả hai đều khớp, ngược lại là \`false\`.
-4.  Điền vào \`"found_title"\` và \`"found_channel"\` với thông tin bạn thực sự tìm thấy tại URL.
-5.  Nếu \`"is_match"\` là \`true\`, hãy tiến hành phân tích và điền vào mục \`"analysis"\`. Nếu là \`false\`, hãy để các trường trong \`"analysis"\` là chuỗi rỗng.`;
+**QUY TẮC TUYỆT ĐỐI:**
+- Nếu \`is_match\` là \`false\`, tất cả các trường trong \`analysis\` PHẢI là chuỗi rỗng.
+- Toàn bộ phản hồi của bạn PHẢI là một khối mã JSON hợp lệ.`;
             
             const response = await ai.models.generateContent({
                 model,
