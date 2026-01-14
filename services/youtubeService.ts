@@ -31,7 +31,10 @@ async function executeWithKeyRotation<T>(
 const extractChannelIdentifier = (url: string): string | null => {
     try {
         const urlObj = new URL(url);
-        const pathParts = urlObj.pathname.split('/').filter(part => part);
+        // FIX: decodeURIComponent to handle special characters (e.g., Vietnamese) in URL path
+        // URL pathname usually comes percent-encoded (e.g. @M%E1%BA%ADt...)
+        // We must decode it to get the actual characters (@Mật...) for the API
+        const pathParts = urlObj.pathname.split('/').filter(part => part).map(p => decodeURIComponent(p));
 
         if (pathParts[0] === 'channel' && pathParts[1]) {
             return pathParts[1]; // e.g., /channel/UC...
@@ -60,57 +63,10 @@ async function handleApiResponse<T,>(response: Response): Promise<T> {
     return data;
 }
 
-const getChannelInfoInternal = async (channelUrl: string, apiKey: string): Promise<ChannelInfo> => {
-    const identifier = extractChannelIdentifier(channelUrl);
-    if (!identifier) {
-        throw new Error('Định dạng URL kênh YouTube không hợp lệ.');
-    }
-
-    let channelId: string | undefined;
-
-    if (identifier.startsWith('UC') || identifier.startsWith('HC')) {
-        channelId = identifier;
-    } 
-    else {
-        const searchParams = new URLSearchParams({
-            part: 'id',
-            q: identifier,
-            type: 'channel',
-            maxResults: '1',
-            key: apiKey
-        });
-
-        const searchResponse = await fetch(`${API_BASE_URL}/search?${searchParams.toString()}`);
-        const searchData = await handleApiResponse<{ items: any[] }>(searchResponse);
-
-        if (searchData.items && searchData.items.length > 0) {
-            channelId = searchData.items[0].id.channelId;
-        }
-    }
-
-    if (!channelId) {
-         throw new Error('Không tìm thấy kênh. Vui lòng kiểm tra lại URL.');
-    }
-
-    const channelDetailsParams = new URLSearchParams({
-        part: 'snippet,contentDetails,statistics',
-        id: channelId,
-        key: apiKey
-    });
-    
-    const response = await fetch(`${API_BASE_URL}/channels?${channelDetailsParams.toString()}`);
-    const data = await handleApiResponse<{ items: any[] }>(response);
-    
-    if (!data.items || data.items.length === 0) {
-        throw new Error('Không tìm thấy kênh. Vui lòng kiểm tra lại URL.');
-    }
-
-    const channelData = data.items[0];
-    
+const mapToChannelInfo = (channelData: any): ChannelInfo => {
     if (!channelData.contentDetails?.relatedPlaylists?.uploads) {
         throw new Error('Không thể tìm thấy danh sách video tải lên của kênh này.');
     }
-
     return {
         id: channelData.id,
         title: channelData.snippet.title,
@@ -123,6 +79,82 @@ const getChannelInfoInternal = async (channelUrl: string, apiKey: string): Promi
         subscriberCount: channelData.statistics.subscriberCount,
         videoCount: channelData.statistics.videoCount,
     };
+};
+
+const getChannelInfoInternal = async (channelUrl: string, apiKey: string): Promise<ChannelInfo> => {
+    const identifier = extractChannelIdentifier(channelUrl);
+    if (!identifier) {
+        throw new Error('Định dạng URL kênh YouTube không hợp lệ.');
+    }
+
+    // 1. Direct lookup by Channel ID (UC...) or HC...
+    if (identifier.startsWith('UC') || identifier.startsWith('HC')) {
+         const channelDetailsParams = new URLSearchParams({
+            part: 'snippet,contentDetails,statistics',
+            id: identifier,
+            key: apiKey
+        });
+        const response = await fetch(`${API_BASE_URL}/channels?${channelDetailsParams.toString()}`);
+        const data = await handleApiResponse<{ items: any[] }>(response);
+        
+        if (!data.items || data.items.length === 0) {
+            throw new Error('Không tìm thấy kênh với ID này.');
+        }
+        return mapToChannelInfo(data.items[0]);
+    } 
+    
+    // 2. Direct lookup by Handle (@...)
+    // This is more reliable for handles than generic search
+    if (identifier.startsWith('@')) {
+         const handleParams = new URLSearchParams({
+            part: 'snippet,contentDetails,statistics',
+            forHandle: identifier,
+            key: apiKey
+        });
+
+        const response = await fetch(`${API_BASE_URL}/channels?${handleParams.toString()}`);
+        const data = await handleApiResponse<{ items: any[] }>(response);
+
+        if (data.items && data.items.length > 0) {
+             return mapToChannelInfo(data.items[0]);
+        }
+        
+        // If handle lookup fails, it usually means the handle doesn't exist.
+        throw new Error(`Không tìm thấy kênh với Handle: ${identifier}`);
+    }
+
+    // 3. Fallback: Search for Custom URL or User
+    const searchParams = new URLSearchParams({
+        part: 'id',
+        q: identifier,
+        type: 'channel',
+        maxResults: '1',
+        key: apiKey
+    });
+
+    const searchResponse = await fetch(`${API_BASE_URL}/search?${searchParams.toString()}`);
+    const searchData = await handleApiResponse<{ items: any[] }>(searchResponse);
+
+    if (searchData.items && searchData.items.length > 0) {
+        const channelId = searchData.items[0].id.channelId;
+        
+        const channelDetailsParams = new URLSearchParams({
+            part: 'snippet,contentDetails,statistics',
+            id: channelId,
+            key: apiKey
+        });
+        
+        const response = await fetch(`${API_BASE_URL}/channels?${channelDetailsParams.toString()}`);
+        const data = await handleApiResponse<{ items: any[] }>(response);
+        
+        if (!data.items || data.items.length === 0) {
+            throw new Error('Không tìm thấy kênh.');
+        }
+
+        return mapToChannelInfo(data.items[0]);
+    }
+
+    throw new Error('Không tìm thấy kênh. Vui lòng kiểm tra lại URL.');
 };
 
 const fetchVideosPageInternal = async (
